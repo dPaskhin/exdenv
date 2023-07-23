@@ -47,6 +47,8 @@
     "@rollup/plugin-node-resolve": "^15.1.0",
     "@types/jest": "^29.5.3",
     "@types/node": "^20.4.4",
+    "commitizen": "^4.3.0",
+    "cz-conventional-changelog": "^3.3.0",
     "prettier": "^3.0.0",
     "rimraf": "^5.0.1",
     "rollup": "^3.26.3",
@@ -58,5 +60,10 @@
   },
   "engines": {
     "node": ">=12"
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
   }
 }
