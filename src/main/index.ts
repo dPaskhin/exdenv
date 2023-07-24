@@ -1,5 +1,5 @@
-import * as d from 'doubter';
-import * as dotenv from 'dotenv';
+import type { AnyShape } from 'doubter';
+import { parse } from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 
@@ -59,12 +59,12 @@ interface IOptions {
  * (like development, testing, and production).
  *
  * @function loadEnv
- * @param {d.AnyShape} schema - The schema object that describes the shape of the environment variables.
+ * @param {AnyShape} schema - The schema object that describes the shape of the environment variables.
  * @param {IOptions} [opt] - Optional parameter that specifies additional options.
  * @see {@link IOptions} for more information about what can be passed as options.
  * @returns {void} No return value. This function modifies the environment variables in-place.
  */
-export function loadEnv(schema: d.AnyShape, opt?: IOptions): void {
+export function loadEnv(schema: AnyShape, opt?: IOptions): void {
   const currentEnvironment = process.env[opt?.processEnvKey || 'NODE_ENV'];
 
   if (!currentEnvironment) {
@@ -88,8 +88,8 @@ export function loadEnv(schema: d.AnyShape, opt?: IOptions): void {
   }
 
   const loadedEnvVariables = Object.assign(
-    dotenv.parse(defaultsEnvFileBuffer || ''),
-    dotenv.parse(coreEnvFileBuffer || ''),
+    parse(defaultsEnvFileBuffer || ''),
+    parse(coreEnvFileBuffer || ''),
   );
 
   const parsedEnvVariablesResult = schema.try(loadedEnvVariables);
