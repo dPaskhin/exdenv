@@ -45,6 +45,7 @@
   "readmeFilename": "README.md",
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^15.1.0",
+    "@rollup/plugin-terser": "^0.4.3",
     "@types/node": "^20.4.4",
     "@types/tap": "^15.0.8",
     "commitizen": "^4.3.0",
