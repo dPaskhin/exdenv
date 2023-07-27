@@ -2,6 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const d = require('doubter');
 const tap = require('tap');
+const dotenv = require('dotenv');
 
 const { loadEnv } = require('../../lib');
 
@@ -22,6 +23,8 @@ const schema = d.object({
 
 tap.beforeEach(() => {
   process.env.NODE_ENV = 'test';
+  delete process.env.DATABASE_URL;
+  delete process.env.JWT_SECRET_TOKEN;
 });
 
 tap.equal(typeof loadEnv, 'function');
@@ -193,6 +196,104 @@ void tap.test('should load environmental variables with custom environment proce
 
   t.equal(process.env.DATABASE_URL, 'defaults.database.url');
   t.equal(process.env.JWT_SECRET_TOKEN, 'defaults_super_mega_secret');
+
+  t.end();
+});
+
+void tap.test('should use dotenv parse function as a custom parser', (t) => {
+  const coreEnvFilePath = path.join(process.cwd(), '.env');
+  const defaultsEnvFilePath = path.join(process.cwd(), '.env.test.defaults');
+
+  fs.writeFileSync(coreEnvFilePath, coreEnvFileContent);
+  fs.writeFileSync(defaultsEnvFilePath, defaultsEnvFileContent);
+
+  loadEnv(schema, { parse: dotenv.parse });
+
+  fs.unlinkSync(coreEnvFilePath);
+  fs.unlinkSync(defaultsEnvFilePath);
+
+  t.equal(process.env.DATABASE_URL, 'core.database.url');
+  t.equal(process.env.JWT_SECRET_TOKEN, 'core_super_mega_secret');
+
+  t.end();
+});
+
+void tap.test('should use custom parse function', (t) => {
+  const envFilePath = path.join(process.cwd(), '.env');
+
+  fs.writeFileSync(envFilePath, coreEnvFileContent);
+
+  const customParser = (input) => {
+    const parsed = {};
+    input.toString().split('\n').forEach((line) => {
+      const [key, value] = line.split('=');
+      if (key && value) {
+        parsed[key.trim()] = value.trim();
+      }
+    });
+    return parsed;
+  };
+
+  loadEnv(schema, { parse: customParser });
+
+  fs.unlinkSync(envFilePath);
+
+  t.equal(process.env.DATABASE_URL, 'core.database.url');
+  t.equal(process.env.JWT_SECRET_TOKEN, 'core_super_mega_secret');
+
+  t.end();
+});
+
+void tap.test('should use custom encoding', (t) => {
+  const envFilePath = path.join(process.cwd(), '.env');
+
+  fs.writeFileSync(envFilePath, 'HELLO=привет', { encoding: 'utf8' });
+
+  // The function attempts to load a file using the ASCII encoding, but there is a non-ASCII encoded-word `Привет` in the file.
+  // This leads to distortion of the original word, as ASCII can't properly represent characters outside its character set,
+  // including the Cyrillic characters used in the word `Привет`.
+  loadEnv(d.object({ HELLO: d.string() }), { encoding: 'ascii' });
+
+  fs.unlinkSync(envFilePath);
+
+  // The broken word `Привет` in loaded variable
+  t.equal(process.env.HELLO, 'P?Q');
+
+  t.end();
+});
+
+
+void tap.test('should loaded double-quoted variables', (t) => {
+  const envFilePath = path.join(process.cwd(), '.env');
+
+  fs.writeFileSync(envFilePath,
+    `DATABASE_URL="defaults.database.url"
+    JWT_SECRET_TOKEN="defaults_super_mega_secret"`,
+  );
+
+  loadEnv(schema);
+
+  fs.unlinkSync(envFilePath);
+
+  t.equal(process.env.DATABASE_URL, 'defaults.database.url');
+  t.equal(process.env.JWT_SECRET_TOKEN, 'defaults_super_mega_secret');
+
+  t.end();
+});
+
+void tap.test('should not load empty value', (t) => {
+  const envFilePath = path.join(process.cwd(), '.env');
+
+  fs.writeFileSync(envFilePath,
+    'asd=',
+  );
+
+  loadEnv(d.any());
+
+  fs.unlinkSync(envFilePath);
+
+  t.equal(process.env.DATABASE_URL, undefined);
+  t.equal(process.env.JWT_SECRET_TOKEN, undefined);
 
   t.end();
 });

@@ -1,5 +1,4 @@
 import type { AnyShape } from 'doubter';
-import { parse } from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 
@@ -54,6 +53,31 @@ interface IOptions {
    * @type {string}
    */
   processEnvKey?: string;
+
+  /**
+   * A custom parser function for parsing environment variables from .env files.
+   *
+   * If provided, this function will be used to parse the environment variables instead of the default parser.
+   * This can be useful when you need to handle specific parsing scenarios that are not covered by the default parser.
+   *
+   * The function should accept either a string or a Buffer object (representing the contents of an .env file) as its argument,
+   * and it should return an object where the keys are the names of the environment variables and the values are their corresponding values.
+   *
+   * The default parser function uses a regular expression from the dotenv library.
+   *
+   * @type {<Result extends Record<string, string>>(fileContent: string | Buffer) => Result}
+   */
+  parse?: <Result extends Record<string, string>>(fileContent: string | Buffer) => Result;
+
+  /**
+   * Specifies the encoding to use when loading .env files.
+   *
+   * If provided, the .env files will be read using this encoding. If not provided, the loader defaults to 'utf8'.
+   *
+   * @default 'utf8'
+   * @type {BufferEncoding}
+   */
+  encoding?: BufferEncoding;
 }
 
 
@@ -76,6 +100,8 @@ interface IOptions {
  *    development: path.resolve(process.cwd(), '.env.dev.defaults'),
  *  },
  *  processEnvKey: 'MY_ENV',
+ *  parse: dotenv.parse,
+ *  encoding: 'utf8',
  * });
  */
 export function loadEnv(schema: AnyShape, opt?: IOptions): void {
@@ -92,8 +118,8 @@ export function loadEnv(schema: AnyShape, opt?: IOptions): void {
     opt?.defaultsPathsMap?.[currentEnvironment] ||
     path.resolve(process.cwd(), `.env.${currentEnvironment}.defaults`);
 
-  const coreEnvFileBuffer = loadFile(coreEnvFilePath);
-  const defaultsEnvFileBuffer = loadFile(defaultsEnvFilePath);
+  const coreEnvFileBuffer = loadFile(coreEnvFilePath, opt?.encoding);
+  const defaultsEnvFileBuffer = loadFile(defaultsEnvFilePath, opt?.encoding);
 
   if (!coreEnvFileBuffer && !defaultsEnvFileBuffer) {
     throw new Error(
@@ -101,9 +127,11 @@ export function loadEnv(schema: AnyShape, opt?: IOptions): void {
     );
   }
 
+  const actualParse = opt?.parse || parse;
+
   const loadedEnvVariables = Object.assign(
-    parse(defaultsEnvFileBuffer || ''),
-    parse(coreEnvFileBuffer || ''),
+    actualParse(defaultsEnvFileBuffer || ''),
+    actualParse(coreEnvFileBuffer || ''),
   );
 
   const parsedEnvVariablesResult = schema.try(loadedEnvVariables);
@@ -119,10 +147,66 @@ export function loadEnv(schema: AnyShape, opt?: IOptions): void {
   Object.assign(process.env, parsedEnvVariablesResult.value);
 }
 
-function loadFile(filePath: string): Buffer | undefined {
+function loadFile(filePath: string, encoding?: BufferEncoding): Buffer | string | undefined {
   try {
-    return fs.readFileSync(filePath);
+    return fs.readFileSync(filePath, { encoding });
   } catch {
     return undefined;
   }
+}
+
+/**
+ * A regular expression to parse variable declarations that might include the 'export' modifier and optional comments.
+ *
+ * @type {RegExp}
+ * @property {RegExp}
+ * - Starts by looking for the start of a line, possibly followed by whitespace and the 'export' keyword.
+ * - Captures a variable identifier, which can consist of alphanumeric characters, underscores, periods, and dashes.
+ * - Looks for an equals sign or colon surrounded by any amount of whitespace.
+ * - Captures the variable value which might be in single, double, or backticks (with support for escaped quotes within),
+ *   or any non-newline or `#` characters. This entire block is optional, which means the variable can be declared without a value.
+ * - Looks for an optional comment starting with `#` and continuing to the end of the line, preceded by any amount of whitespace.
+ * - Finally, it looks for the end of a line.
+ * @property {string} [flags='mg'] - Applies the regular expression to the whole text (m for multiline mode)
+ *                                   and finds every match (g for global search).
+ */
+const LINE = /(?:^|^)\s*(?:export\s+)?([\w.-]+)(?:\s*=\s*?|:\s+?)(\s*'(?:\\'|[^'])*'|\s*"(?:\\"|[^"])*"|\s*`(?:\\`|[^`])*`|[^#\r\n]+)?\s*(?:#.*)?(?:$|$)/mg;
+
+// Parse src into an Object
+function parse(src: string | Buffer) {
+  const obj: Record<string, string> = {};
+
+  // Convert buffer to string
+  let lines = src.toString();
+
+  // Convert line breaks to same format
+  lines = lines.replace(/\r\n?/mg, '\n');
+
+  let match;
+  while ((match = LINE.exec(lines)) != null) {
+    const key = match[1]!;
+
+    // Default undefined or null to empty string
+    let value = (match[2] || '');
+
+    // Remove whitespace
+    value = value.trim();
+
+    // Check if double-quoted
+    const maybeQuote = value[0];
+
+    // Remove surrounding quotes
+    value = value.replace(/^(['"`])([\s\S]*)\1$/mg, '$2');
+
+    // Expand newlines if double-quoted
+    if (maybeQuote === '"') {
+      value = value.replace(/\\n/g, '\n');
+      value = value.replace(/\\r/g, '\r');
+    }
+
+    // Add to object
+    obj[key] = value;
+  }
+
+  return obj;
 }
