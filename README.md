@@ -1,15 +1,16 @@
 # exdenv
 
-**exdenv**, a library inspired by tools such as [dotenv](https://www.npmjs.com/package/dotenv) (which it uses under the hood),
-and [dotenv-extended](https://www.npmjs.com/package/dotenv-extended), addresses the challenge of handling environment
-variables across various development contexts like development, testing, and production.
+**exdenv**, a library inspired by tools such as [dotenv](https://www.npmjs.com/package/dotenv) (from which the function
+to parse .env files and regular expression was borrowed), and [dotenv-extended](https://www.npmjs.com/package/dotenv-extended),
+addresses the challenge of handling environment variables across various development contexts like development,
+testing, and production.
 
 While **dotenv-extended** offered helpful features like default environment variables and schema validation, 
 it didn't fully address the need for managing unique environment variables across different environments.
 
 **exdenv** resolves this problem by providing a convenient way to handle default environment variables for different situations.
 With **exdenv**, you can load environment variables using `.env.[environment].defaults` in combination with the base `.env` file.
-This would be a familiar process if you've used dotenv-extended, but here added environment-specific defaults.
+This would be a familiar process if you've used **dotenv-extended**, but here added environment-specific defaults.
 
 Here is a typical setup of your files:
 
@@ -99,6 +100,8 @@ For more detailed examples look at [Real live examples of usage](#real-live-exam
  *    'development': path.resolve(process.cwd(), '.env.dev.defaults'),
  *  },
  *  processEnvKey: 'MY_ENV',
+ *  parse: dotenv.parse,
+ *  encoding: 'utf8',
  * });
  */
 export declare function loadEnv(schema: AnyShape, opt?: IOptions): void;
@@ -171,6 +174,31 @@ interface IOptions {
    * @type {string}
    */
   processEnvKey?: string;
+
+  /**
+   * A custom parser function for parsing environment variables from .env files.
+   *
+   * If provided, this function will be used to parse the environment variables instead of the default parser.
+   * This can be useful when you need to handle specific parsing scenarios that are not covered by the default parser.
+   *
+   * The function should accept either a string or a Buffer object (representing the contents of an .env file) as its argument,
+   * and it should return an object where the keys are the names of the environment variables and the values are their corresponding values.
+   *
+   * The default parser function uses a regular expression from the dotenv library.
+   *
+   * @type {<Result extends Record<string, string>>(fileContent: string | Buffer) => Result}
+   */
+  parse?: <Result extends Record<string, string>>(fileContent: string | Buffer) => Result;
+
+  /**
+   * Specifies the encoding to use when loading .env files.
+   *
+   * If provided, the .env files will be read using this encoding. If not provided, the loader defaults to 'utf8'.
+   *
+   * @default 'utf8'
+   * @type {BufferEncoding}
+   */
+  encoding?: BufferEncoding;
 }
 ```
 
@@ -318,6 +346,57 @@ if (process.env.NODE_ENV === 'development') {
 }
 ```
 
+### Usage with a custom parser
+
+You can provide your custom parser function when calling the `loadEnv` function as follows:
+
+```ts
+import * as d from 'doubter';
+import { loadEnv } from 'exdenv';
+
+const schema = d.object({
+  DATABASE_URL: d.string(),
+  JWT_SECRET: d.string(),
+});
+
+const customParser = (input) => {
+  const parsed = {};
+  input.toString().split('\n').forEach((line) => {
+    const [key, value] = line.split('=');
+    if (key && value) {
+      parsed[key.trim()] = value.trim();
+    }
+  });
+  return parsed;
+};
+
+loadEnv(schema, { parse: customParser });
+
+// Now, the environment variables will be parsed using your customParser function.
+```
+
+In this example, `customParser` is a simple function that parses the .env file content line by line, splitting each line
+at the equals sign to get the name and value of each environment variable. Note that this is a simple parser that
+doesn't handle complex scenarios, such as quoted values or escaped characters, but it illustrates the basic concept of
+how a custom parser function can be used.
+
+### Usage with custom encoding
+
+If your .env files are not in UTF-8 encoding, you can specify the `encoding` when calling the `loadEnv` function:
+
+```ts
+import * as d from 'doubter';
+import { loadEnv } from 'exdenv';
+
+const schema = d.object({
+  DATABASE_URL: d.string(),
+  JWT_SECRET: d.string(),
+});
+
+loadEnv(schema, { encoding: 'latin1' });
+
+// Now, the .env files will be read using the specified 'latin1' encoding.
+```
 
 ## Future updates
 
