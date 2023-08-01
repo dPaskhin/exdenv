@@ -36,10 +36,7 @@ interface IOptions {
    *
    * @type {Record<string | 'test' | 'development' | 'production', string>}
    */
-  defaultsPathsMap?: Record<
-    string | 'test' | 'development' | 'production',
-    string
-  >;
+  defaultsPathsMap?: Record<string | 'test' | 'development' | 'production', string>;
 
   /**
    * Specifies the key for accessing the process environment.
@@ -80,7 +77,6 @@ interface IOptions {
   encoding?: BufferEncoding;
 }
 
-
 /**
  * Loads environment variables from the .env file and the corresponding .env default file
  * based on the current environment setting.
@@ -108,22 +104,21 @@ export function loadEnv(schema: AnyShape, opt?: IOptions): void {
   const currentEnvironment = process.env[opt?.processEnvKey || 'NODE_ENV'];
 
   if (!currentEnvironment) {
-    throw new Error(
-      'For loading the actual .env defaults file, there is necessary environment in process.env',
+    return console.error(
+      errorPrefix + 'for loading the actual .env defaults file, there is necessary environment in process.env'
     );
   }
 
   const coreEnvFilePath = opt?.corePath || path.resolve(process.cwd(), '.env');
   const defaultsEnvFilePath =
-    opt?.defaultsPathsMap?.[currentEnvironment] ||
-    path.resolve(process.cwd(), `.env.${currentEnvironment}.defaults`);
+    opt?.defaultsPathsMap?.[currentEnvironment] || path.resolve(process.cwd(), `.env.${currentEnvironment}.defaults`);
 
   const coreEnvFileBuffer = loadFile(coreEnvFilePath, opt?.encoding);
   const defaultsEnvFileBuffer = loadFile(defaultsEnvFilePath, opt?.encoding);
 
   if (!coreEnvFileBuffer && !defaultsEnvFileBuffer) {
-    throw new Error(
-      'There are necessary either the core (.env) file or defaults (.env.[environment].defaults) file',
+    return console.error(
+      errorPrefix + 'there are necessary either the core (.env) file or defaults (.env.[environment].defaults) file'
     );
   }
 
@@ -131,16 +126,17 @@ export function loadEnv(schema: AnyShape, opt?: IOptions): void {
 
   const loadedEnvVariables = Object.assign(
     actualParse(defaultsEnvFileBuffer || ''),
-    actualParse(coreEnvFileBuffer || ''),
+    actualParse(coreEnvFileBuffer || '')
   );
 
   const parsedEnvVariablesResult = schema.try(loadedEnvVariables);
 
   if (!parsedEnvVariablesResult.ok) {
-    throw new Error(
-      `Validation errors: ${parsedEnvVariablesResult.issues
-        .map((value) => JSON.stringify(value, null, 2))
-        .join('\n')}`,
+    return console.error(
+      errorPrefix +
+        `validation errors: ${parsedEnvVariablesResult.issues
+          .map((value) => JSON.stringify(value, null, 2))
+          .join('\n')}`
     );
   }
 
@@ -170,7 +166,8 @@ function loadFile(filePath: string, encoding?: BufferEncoding): Buffer | string 
  * @property {string} [flags='mg'] - Applies the regular expression to the whole text (m for multiline mode)
  *                                   and finds every match (g for global search).
  */
-const LINE = /(?:^|^)\s*(?:export\s+)?([\w.-]+)(?:\s*=\s*?|:\s+?)(\s*'(?:\\'|[^'])*'|\s*"(?:\\"|[^"])*"|\s*`(?:\\`|[^`])*`|[^#\r\n]+)?\s*(?:#.*)?(?:$|$)/mg;
+const LINE =
+  /(?:^|^)\s*(?:export\s+)?([\w.-]+)(?:\s*=\s*?|:\s+?)(\s*'(?:\\'|[^'])*'|\s*"(?:\\"|[^"])*"|\s*`(?:\\`|[^`])*`|[^#\r\n]+)?\s*(?:#.*)?(?:$|$)/gm;
 
 // Parse src into an Object
 function parse(src: string | Buffer) {
@@ -180,14 +177,14 @@ function parse(src: string | Buffer) {
   let lines = src.toString();
 
   // Convert line breaks to same format
-  lines = lines.replace(/\r\n?/mg, '\n');
+  lines = lines.replace(/\r\n?/gm, '\n');
 
   let match;
   while ((match = LINE.exec(lines)) != null) {
     const key = match[1]!;
 
     // Default undefined or null to empty string
-    let value = (match[2] || '');
+    let value = match[2] || '';
 
     // Remove whitespace
     value = value.trim();
@@ -196,7 +193,7 @@ function parse(src: string | Buffer) {
     const maybeQuote = value[0];
 
     // Remove surrounding quotes
-    value = value.replace(/^(['"`])([\s\S]*)\1$/mg, '$2');
+    value = value.replace(/^(['"`])([\s\S]*)\1$/gm, '$2');
 
     // Expand newlines if double-quoted
     if (maybeQuote === '"') {
@@ -210,3 +207,5 @@ function parse(src: string | Buffer) {
 
   return obj;
 }
+
+const errorPrefix = '[EXDENV] Loading env variables error occurred: ';

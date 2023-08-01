@@ -32,25 +32,47 @@ tap.equal(typeof loadEnv, 'function');
 void tap.test('should throw an error when there is no env in process', (t) => {
   delete process.env.NODE_ENV;
 
-  void t.throws(() => loadEnv(schema), new Error('For loading the actual .env defaults file, there is necessary environment in process.env'));
+  let errorText = '';
+
+  console.error = (value) => {
+    errorText = value;
+  };
+
+  loadEnv(schema);
+
+  void t.matchSnapshot(errorText);
 
   t.end();
 });
 
 void tap.test('should throw an error when there is no core and defaults files', (t) => {
-  void t.throws(() => loadEnv(schema), new Error('There are necessary either the core (.env) file or defaults (.env.[environment].defaults) file'));
+  let errorText = '';
+
+  console.error = (value) => {
+    errorText = value;
+  };
+
+  loadEnv(schema);
+
+  void t.matchSnapshot(errorText);
 
   t.end();
 });
 
-void tap.test('should throw an validation error when .env files don\'t corresponding the schema', (t) => {
+void tap.test("should throw an validation error when .env files don't corresponding the schema", (t) => {
+  let errorText = '';
+
+  console.error = (value) => {
+    errorText = value;
+  };
+
   const coreEnvFilePath = path.join(process.cwd(), '.env');
 
-  fs.writeFileSync(coreEnvFilePath,
-    `JWT_SECRET_TOKEN=core_super_mega_secret`,
-  );
+  fs.writeFileSync(coreEnvFilePath, `JWT_SECRET_TOKEN=core_super_mega_secret`);
 
-  t.throws(() => loadEnv(schema));
+  loadEnv(schema);
+
+  void t.matchSnapshot(errorText);
 
   fs.unlinkSync(coreEnvFilePath);
 
@@ -113,7 +135,7 @@ void tap.test('should load environmental variables mixed up from core and defaul
   fs.writeFileSync(
     defaultsEnvFilePath,
     `DATABASE_URL=defaults.database.url
-    JWT_SECRET_TOKEN=defaults_super_mega_secret`,
+    JWT_SECRET_TOKEN=defaults_super_mega_secret`
   );
 
   loadEnv(schema);
@@ -143,10 +165,7 @@ void tap.test('should load environmental variables by custom core path', (t) => 
 });
 
 void tap.test('should load environmental variables by custom core path', (t) => {
-  const defaultsEnvFilePath = path.join(
-    process.cwd(),
-    '../.env.test.defaults',
-  );
+  const defaultsEnvFilePath = path.join(process.cwd(), '../.env.test.defaults');
 
   fs.writeFileSync(defaultsEnvFilePath, defaultsEnvFileContent);
 
@@ -163,10 +182,7 @@ void tap.test('should load environmental variables by custom core path', (t) => 
 void tap.test('should load environmental variables with custom environment', (t) => {
   process.env.NODE_ENV = 'custom';
 
-  const defaultsEnvFilePath = path.join(
-    process.cwd(),
-    '.env.custom.defaults',
-  );
+  const defaultsEnvFilePath = path.join(process.cwd(), '.env.custom.defaults');
 
   fs.writeFileSync(defaultsEnvFilePath, defaultsEnvFileContent);
 
@@ -183,10 +199,7 @@ void tap.test('should load environmental variables with custom environment', (t)
 void tap.test('should load environmental variables with custom environment process variable', (t) => {
   process.env.CUSTOM_ENV = 'custom';
 
-  const defaultsEnvFilePath = path.join(
-    process.cwd(),
-    '.env.custom.defaults',
-  );
+  const defaultsEnvFilePath = path.join(process.cwd(), '.env.custom.defaults');
 
   fs.writeFileSync(defaultsEnvFilePath, defaultsEnvFileContent);
 
@@ -225,12 +238,15 @@ void tap.test('should use custom parse function', (t) => {
 
   const customParser = (input) => {
     const parsed = {};
-    input.toString().split('\n').forEach((line) => {
-      const [key, value] = line.split('=');
-      if (key && value) {
-        parsed[key.trim()] = value.trim();
-      }
-    });
+    input
+      .toString()
+      .split('\n')
+      .forEach((line) => {
+        const [key, value] = line.split('=');
+        if (key && value) {
+          parsed[key.trim()] = value.trim();
+        }
+      });
     return parsed;
   };
 
@@ -262,13 +278,13 @@ void tap.test('should use custom encoding', (t) => {
   t.end();
 });
 
-
 void tap.test('should loaded double-quoted variables', (t) => {
   const envFilePath = path.join(process.cwd(), '.env');
 
-  fs.writeFileSync(envFilePath,
+  fs.writeFileSync(
+    envFilePath,
     `DATABASE_URL="defaults.database.url"
-    JWT_SECRET_TOKEN="defaults_super_mega_secret"`,
+    JWT_SECRET_TOKEN="defaults_super_mega_secret"`
   );
 
   loadEnv(schema);
@@ -284,9 +300,7 @@ void tap.test('should loaded double-quoted variables', (t) => {
 void tap.test('should not load empty value', (t) => {
   const envFilePath = path.join(process.cwd(), '.env');
 
-  fs.writeFileSync(envFilePath,
-    'asd=',
-  );
+  fs.writeFileSync(envFilePath, 'asd=');
 
   loadEnv(d.any());
 

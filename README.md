@@ -398,6 +398,17 @@ loadEnv(schema, { encoding: 'latin1' });
 // Now, the .env files will be read using the specified 'latin1' encoding.
 ```
 
+## Errors
+
+Errors may occur in the following scenarios:
+
+1. No environment exists in `process.env`.
+2. Both core `.env` and defaults `.env` files are missing or cannot be found.
+3. Validation errors occur while parsing `.env` files.
+
+All these errors will output a `console.error` and won't cause your code to break immediately. However, your code could fail later if it relies on `.env` variables in `process.env`.
+
+
 ## Future updates
 
 .env.schema - This feature will be implemented once the `fromJSON` feature is available
