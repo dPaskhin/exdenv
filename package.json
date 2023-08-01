@@ -1,6 +1,6 @@
 {
   "name": "exdenv",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "A module for loading .env files with default environmental files using schema for validating.",
   "keywords": [
     "exdenv",
